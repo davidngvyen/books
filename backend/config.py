@@ -14,6 +14,7 @@ class Config:
     DB_USER = os.getenv('DB_USER', 'root')
     DB_PASSWORD = os.getenv('DB_PASSWORD', '')
     DB_NAME = os.getenv('DB_NAME', 'bookstore')
+    DB_POOL_SIZE = int(os.getenv('DB_POOL_SIZE', '5'))
     
     #jwt tokens
     JWT_SECRET = os.getenv('JWT_SECRET', SECRET_KEY)

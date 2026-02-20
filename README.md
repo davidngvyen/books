@@ -1,55 +1,108 @@
-'backend/' – Flask API
-'desktop_client/' – Python desktop app (Tkinter GUI)
+# Online Bookstore (Flask + MySQL + Desktop Client)
 
-Run the backend first, then run the desktop client.
+This project contains:
+- `backend/` – Flask REST API
+- `desktop_client/` – Python Tkinter desktop application
+- `database/` – MySQL schema
 
-1. What you need installed
-PythonMySQL Server
-'pip'
+Run backend first, then desktop client.
 
-Python packages you will probably need:
-Backend
-powershell
+## 1) Prerequisites
+
+- Python 3.10+
+- MySQL Server 5.7+ / 8+
+- `pip`
+
+Install backend dependencies:
+
+```powershell
+cd backend
 pip install flask flask-cors python-dotenv pymysql bcrypt pyjwt
+```
 
-Desktop client
-powershell
+Install desktop client dependencies:
+
+```powershell
+cd ../desktop_client
 pip install requests
+```
 
-2. Set up the database
+## 2) Database Setup
 
-1. Start MySQL on your computer.
-2. Create a database called 'bookstore'.
-3. Run the SQL file in 'database/schema.sql' to create tables.
+1. Start MySQL.
+2. Create database (optional, schema also creates it):
 
+```sql
+CREATE DATABASE IF NOT EXISTS bookstore;
+```
 
-3. Create a '.env' file
-Example '.env':
+3. Run schema file:
+- `database/schema.sql`
 
-env
-#Flask secret key
+Schema now includes **8 normalized tables**:
+- `users`
+- `books` (with `isbn` unique)
+- `orders` (with `customer_id`)
+- `order_items`
+- `categories`
+- `book_categories`
+- `reviews`
+- `addresses`
+
+## 3) Environment Configuration
+
+Create `backend/.env`:
+
+```env
 SECRET_KEY=dev-secret-key-change-this
+JWT_SECRET=another-secret-key-here
+DEBUG=False
 
-
-#Database connection
 DB_HOST=localhost
 DB_USER=root
 DB_PASSWORD=your_mysql_password_here
 DB_NAME=bookstore
+DB_POOL_SIZE=5
 
-#JWT secret for tokens
-JWT_SECRET=another-secret-key-here
-
-#CORS allowed origins
 CORS_ORIGINS=*
+```
 
-Change 'DB_USER' and 'DB_PASSWORD' to match your local MySQL user.
+## 4) Run Backend
 
-4. Run the backend
-In a terminal: python app.py
-Keep this terminal open.
+```powershell
+cd backend
+python app.py
+```
 
-5. Run the desktop client
-Open a new terminal run: python main.py
+Backend runs at `http://localhost:5000`.
 
-A window should open for the bookstore app.
+## 5) Run Desktop Client
+
+```powershell
+cd ../desktop_client
+python main.py
+```
+
+## 6) Implemented Highlights
+
+- JWT authentication + role-based authorization (`customer`, `manager`)
+- bcrypt password hashing
+- Parameterized SQL queries (SQL injection prevention)
+- PyMySQL connection pooling (`DB_POOL_SIZE`, default 5)
+- LRU book-search cache (`OrderedDict`, key = query string, max 100)
+- Cache invalidation on book create/update
+- Review endpoints and category mapping support
+- Address management + order shipping-address support
+
+## 7) Core API Endpoints
+
+- Auth: `/api/auth/register`, `/api/auth/login`
+- Books: `/api/books`, `/api/books/categories`, `/api/books/<id>/reviews`
+- Orders: `/api/orders`, `/api/orders/<id>`, `/api/orders/addresses`
+- Manager: `/api/manager/orders`, `/api/manager/books`, `/api/manager/categories`
+
+## 8) Notes
+
+- Orders now reference `customer_id` (not `user_id`).
+- `books.isbn` is unique and indexed.
+- `orders.customer_id` is indexed for order history performance.

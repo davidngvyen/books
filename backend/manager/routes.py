@@ -3,11 +3,38 @@ from auth.routes import role_required
 from models import (
     get_all_orders, get_order_by_id, get_order_items,
     update_order_payment_status, create_book, update_book,
-    get_all_books, get_all_books_for_manager, get_book_by_id
+    get_all_books, get_all_books_for_manager, get_book_by_id,
+    replace_book_categories, get_all_categories, create_category
 )
 from cache import cache
 
 manager_bp = Blueprint('manager', __name__, url_prefix='/api/manager')
+
+@manager_bp.route('/categories', methods=['GET'])
+@role_required('manager')
+def get_categories_manager():
+    try:
+        categories = get_all_categories()
+        return jsonify({'categories': categories, 'count': len(categories)}), 200
+    except Exception as e:
+        return jsonify({'error': f'Failed to retrieve categories: {str(e)}'}), 500
+
+@manager_bp.route('/categories', methods=['POST'])
+@role_required('manager')
+def add_category():
+    data = request.get_json()
+    if not data or 'name' not in data:
+        return jsonify({'error': 'Missing category name'}), 400
+
+    name = data['name'].strip()
+    if not name:
+        return jsonify({'error': 'Category name cannot be empty'}), 400
+
+    try:
+        category_id = create_category(name)
+        return jsonify({'message': 'Category created successfully', 'category_id': category_id}), 201
+    except Exception as e:
+        return jsonify({'error': f'Failed to create category: {str(e)}'}), 500
 
 @manager_bp.route('/orders', methods=['GET'])
 @role_required('manager')
@@ -104,12 +131,14 @@ def get_all_books_manager():
 def add_book():
     data = request.get_json()
     
-    required_fields = ['title', 'author', 'price_buy', 'price_rent']
+    required_fields = ['isbn', 'title', 'author', 'price_buy', 'price_rent']
     if not data or not all(field in data for field in required_fields):
         return jsonify({'error': f'Missing required fields. Required: {", ".join(required_fields)}'}), 400
     
+    isbn = data['isbn'].strip()
     title = data['title'].strip()
     author = data['author'].strip()
+    category_ids = data.get('category_ids', [])
     
     try:
         price_buy = float(data['price_buy'])
@@ -121,17 +150,21 @@ def add_book():
     except (ValueError, TypeError):
         return jsonify({'error': 'Invalid price format'}), 400
     
+    if len(isbn) < 10:
+        return jsonify({'error': 'ISBN must be at least 10 characters'}), 400
     if len(title) < 1 or len(author) < 1:
         return jsonify({'error': 'Title and author cannot be empty'}), 400
     
     try:
-        book_id = create_book(title, author, price_buy, price_rent)
+        book_id = create_book(isbn, title, author, price_buy, price_rent)
+        replace_book_categories(book_id, category_ids)
         
-        cache.clear()
+        cache.invalidate()
         
         return jsonify({
             'message': 'Book added successfully',
             'book_id': book_id,
+            'isbn': isbn,
             'title': title,
             'author': author
         }), 201
@@ -148,13 +181,15 @@ def edit_book(book_id):
     if not book:
         return jsonify({'error': 'Book not found'}), 404
     
-    required_fields = ['title', 'author', 'price_buy', 'price_rent', 'available']
+    required_fields = ['isbn', 'title', 'author', 'price_buy', 'price_rent', 'available']
     if not data or not all(field in data for field in required_fields):
         return jsonify({'error': f'Missing required fields. Required: {", ".join(required_fields)}'}), 400
     
+    isbn = data['isbn'].strip()
     title = data['title'].strip()
     author = data['author'].strip()
     available = bool(data['available'])
+    category_ids = data.get('category_ids', [])
     
     try:
         price_buy = float(data['price_buy'])
@@ -166,13 +201,16 @@ def edit_book(book_id):
     except (ValueError, TypeError):
         return jsonify({'error': 'Invalid price format'}), 400
     
+    if len(isbn) < 10:
+        return jsonify({'error': 'ISBN must be at least 10 characters'}), 400
     if len(title) < 1 or len(author) < 1:
         return jsonify({'error': 'Title and author cannot be empty'}), 400
     
     try:
-        update_book(book_id, title, author, price_buy, price_rent, available)
+        update_book(book_id, isbn, title, author, price_buy, price_rent, available)
+        replace_book_categories(book_id, category_ids)
         
-        cache.clear()
+        cache.invalidate()
         
         return jsonify({
             'message': 'Book updated successfully',
